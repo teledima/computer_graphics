@@ -39,6 +39,7 @@ GLuint createShader(const GLchar* code, GLenum type)
             char* infoLog = new char[infoLen];
             glGetShaderInfoLog(result, infoLen, NULL, infoLog);
             cout << "Shader compilation error" << endl << infoLog << endl;
+            delete infoLog;
         }
         glDeleteShader(result);
         return 0;
