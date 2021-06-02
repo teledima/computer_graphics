@@ -103,10 +103,13 @@ bool createShaderProgram()
         ""
         "void main()"
         "{"
-        "   o_color = vec4(v_color, 0.0);"
+        "   o_color = vec4( "
+        "                   round(sin(sin(v_color.g * 2 * 3 * 6) * 0.5 * 3 * 2 + 0.5 * 2 * 3.14 * 100 - (v_color.r - 3) * 2 * 3.14 * 10) * 0.5 + 0.5), "
+        "                   0, 0, 0.0 "
+        "                 );"
         "}"
         ;
-
+    // round(sin(((v_color.r-0.5)*(v_color.r-0.5)+(v_color.g-0.5)*(v_color.g-0.5))*2*3.14*10))
     GLuint vertexShader, fragmentShader;
 
     vertexShader = createShader(vsh, GL_VERTEX_SHADER);
@@ -116,7 +119,6 @@ bool createShaderProgram()
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
-
     return g_shaderProgram != 0;
 }
 
@@ -125,9 +127,9 @@ bool createModel()
     const GLfloat vertices[] =
     {
         -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-         0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f, 0.0f, 0.0f, 1.0f,
-        -0.5f,  0.5f, 1.0f, 1.0f, 0.0f,
+         0.5f, -0.5f, 1.0f, 1.0f, 0.0f,
+         0.5f,  0.5f, 0.0f, 1.0f, 0.0f,
+        -0.5f,  0.5f, 0.0f, 0.0f, 0.0f,
     };
 
     const GLuint indices[] =
