@@ -7,6 +7,7 @@ using namespace std;
 GLFWwindow* g_window;
 
 GLuint g_shaderProgram;
+GLint g_uMVP;
 
 class Model
 {
@@ -35,7 +36,7 @@ GLuint createShader(const GLchar* code, GLenum type)
         glGetShaderiv(result, GL_INFO_LOG_LENGTH, &infoLen);
         if (infoLen > 0)
         {
-            char* infoLog = (char*)alloca(infoLen);
+            char* infoLog = new char[infoLen];
             glGetShaderInfoLog(result, infoLen, NULL, infoLog);
             cout << "Shader compilation error" << endl << infoLog << endl;
         }
@@ -82,15 +83,17 @@ bool createShaderProgram()
     const GLchar vsh[] =
         "#version 330\n"
         ""
-        "layout(location = 0) in vec2 a_position;"
+        "layout(location = 0) in vec3 a_position;"
         "layout(location = 1) in vec3 a_color;"
+        ""
+        "uniform mat4 u_mvp;"
         ""
         "out vec3 v_color;"
         ""
         "void main()"
         "{"
         "    v_color = a_color;"
-        "    gl_Position = vec4(a_position, 0.0, 1.0);"
+        "    gl_Position = u_mvp * vec4(a_position, 1.0);"
         "}"
         ;
 
@@ -103,7 +106,7 @@ bool createShaderProgram()
         ""
         "void main()"
         "{"
-        "   o_color = vec4(v_color, 0.0);"
+        "   o_color = vec4(v_color, 1.0);"
         "}"
         ;
 
@@ -113,6 +116,8 @@ bool createShaderProgram()
     fragmentShader = createShader(fsh, GL_FRAGMENT_SHADER);
 
     g_shaderProgram = createProgram(vertexShader, fragmentShader);
+
+    g_uMVP = glGetUniformLocation(g_shaderProgram, "u_mvp");
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
@@ -124,15 +129,45 @@ bool createModel()
 {
     const GLfloat vertices[] =
     {
-        -0.5f, -0.5f, 1.0f, 0.0f, 0.0f,
-         0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-         0.5f,  0.5f, 0.0f, 0.0f, 1.0f,
-        -0.5f,  0.5f, 1.0f, 1.0f, 0.0f,
+        -1.0, -1.0, 1.0, 1.0, 0.0, 0.0,
+        1.0, -1.0, 1.0, 1.0, 0.0, 0.0,
+        1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
+        -1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
+
+        1.0, -1.0, 1.0, 1.0, 1.0, 0.0,
+        1.0, -1.0, -1.0, 1.0, 1.0, 0.0,
+        1.0, 1.0, -1.0, 1.0, 1.0, 0.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 0.0,
+
+        1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+        1.0, 1.0, -1.0, 1.0, 0.0, 1.0,
+        -1.0, 1.0, -1.0, 1.0, 0.0, 1.0,
+        -1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+
+        -1.0, 1.0, 1.0, 0.0, 1.0, 1.0,
+        -1.0, 1.0, -1.0, 0.0, 1.0, 1.0,
+        -1.0, -1.0, -1.0, 0.0, 1.0, 1.0,
+        -1.0, -1.0, 1.0, 0.0, 1.0, 1.0,
+
+        -1.0, -1.0, 1.0, 0.0, 1.0, 0.0,
+        -1.0, -1.0, -1.0, 0.0, 1.0, 0.0,
+        1.0, -1.0, -1.0, 0.0, 1.0, 0.0,
+        1.0, -1.0, 1.0, 0.0, 1.0, 0.0,
+
+        -1.0, -1.0, -1.0, 0.0, 0.0, 1.0,
+        -1.0, 1.0, -1.0, 0.0, 0.0, 1.0,
+        1.0, 1.0, -1.0, 0.0, 0.0, 1.0,
+        1.0, -1.0, -1.0, 0.0, 0.0, 1.0,
     };
 
     const GLuint indices[] =
     {
-        0, 1, 2, 2, 3, 0
+        0, 1, 2, 2, 3, 0,
+        4, 5, 6, 6, 7, 4,
+        8, 9, 10, 10, 11, 8,
+        12, 13, 14, 14, 15, 12,
+        16, 17, 18, 18, 19, 16,
+        20, 21, 22, 22, 23, 20
     };
 
     glGenVertexArrays(1, &g_model.vao);
@@ -140,17 +175,18 @@ bool createModel()
 
     glGenBuffers(1, &g_model.vbo);
     glBindBuffer(GL_ARRAY_BUFFER, g_model.vbo);
-    glBufferData(GL_ARRAY_BUFFER, 20 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 24 * 6 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
 
     glGenBuffers(1, &g_model.ibo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_model.ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * sizeof(GLuint), indices, GL_STATIC_DRAW);
-    g_model.indexCount = 6;
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * 6 * sizeof(GLuint), indices, GL_STATIC_DRAW);
+
+    g_model.indexCount = 6 * 6;
 
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (const GLvoid*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (const GLvoid*)0);
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (const GLvoid*)(2 * sizeof(GLfloat)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (const GLvoid*)(3 * sizeof(GLfloat)));
 
     return g_model.vbo != 0 && g_model.ibo != 0 && g_model.vao != 0;
 }
@@ -159,6 +195,8 @@ bool init()
 {
     // Set initial color of color buffer to white.
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+
+    glEnable(GL_DEPTH_TEST);
 
     return createShaderProgram() && createModel();
 }
@@ -171,10 +209,20 @@ void reshape(GLFWwindow* window, int width, int height)
 void draw()
 {
     // Clear color buffer.
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(g_shaderProgram);
     glBindVertexArray(g_model.vao);
+
+    const GLfloat mvp[] =
+    {
+        1.708748f, -1.478188f, -0.360884f, -0.353738f,
+        0.000000f, 1.208897f, -0.883250f, -0.865760f,
+        -1.707388f, -1.479366f, -0.361171f, -0.354019f,
+        0.000000f, 0.000000f, 4.898990f, 5.000000f
+    };
+
+    glUniformMatrix4fv(g_uMVP, 1, GL_FALSE, mvp);
 
     glDrawElements(GL_TRIANGLES, g_model.indexCount, GL_UNSIGNED_INT, NULL);
 }
