@@ -104,12 +104,13 @@ bool createShaderProgram()
         "void main()"
         "{"
         "   o_color = vec4( "
-        "                   round(sin(sin(v_color.g * 2 * 3 * 6) * 0.5 * 3 * 2 + 0.5 * 2 * 3.14 * 100 - (v_color.r - 3) * 2 * 3.14 * 10) * 0.5 + 0.5), "
+        "                   round(sin(sin(v_color.g*2*3*6)*0.5*3*2+0.5*2*3.14*100-(v_color.r-3)*2*3.14*10)*0.5+0.5), "
         "                   0, 0, 0.0 "
         "                 );"
         "}"
         ;
-    // round(sin(((v_color.r-0.5)*(v_color.r-0.5)+(v_color.g-0.5)*(v_color.g-0.5))*2*3.14*10))
+    // round(sin(sin(v_color.g*2*3*6)*0.5*3*2+0.5*2*3.14*100-(v_color.r-3)*2*3.14*10)*0.5+0.5)
+    // round(sin(sqrt((v_color.r-0.5)*(v_color.r-0.5)+(v_color.g-0.5)*(v_color.g-0.5))*2*3*10)*0.5+0.5)
     GLuint vertexShader, fragmentShader;
 
     vertexShader = createShader(vsh, GL_VERTEX_SHADER);
