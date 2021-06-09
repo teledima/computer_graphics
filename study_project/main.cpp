@@ -1,8 +1,20 @@
 #include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <gl/glut.h>
+#include <math.h>
+
+// MV - Modal View Matrix
+// Modal transform (translate, rotate, scale) is to convert from object space to world space.
+// View transform is to convert from world space to eye space.
 
 using namespace std;
+double old_x = numeric_limits<double>::quiet_NaN(), old_y = numeric_limits<double>::quiet_NaN();
+double new_x = numeric_limits<double>::quiet_NaN(), new_y = numeric_limits<double>::quiet_NaN();
+glm::mat4 l_Model = glm::identity<glm::mat4>();
 
 GLFWwindow* g_window;
 
@@ -207,7 +219,7 @@ void reshape(GLFWwindow* window, int width, int height)
     glViewport(0, 0, width, height);
 }
 
-void draw()
+void draw(void)
 {
     // Clear color buffer.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -215,17 +227,39 @@ void draw()
     glUseProgram(g_shaderProgram);
     glBindVertexArray(g_model.vao);
 
-    const GLfloat mvp[] =
-    {
-        1.708748f, -1.478188f, -0.360884f, -0.353738f,
-        0.000000f, 1.208897f, -0.883250f, -0.865760f,
-        -1.707388f, -1.479366f, -0.361171f, -0.354019f,
-        0.000000f, 0.000000f, 4.898990f, 5.000000f
-    };
+    
+    glm::mat4 l_Projection;
+    glm::mat4 l_mvp;
 
-    glUniformMatrix4fv(g_uMVP, 1, GL_FALSE, mvp);
+    l_Projection = glm::ortho(-800.0f / 600.0f, 800.0f / 600.0f, -1.0f, 1.0f, 0.1f, 1000.0f);
+    l_Projection = glm::perspective(45.0f, 800.0f / 600.0f, 0.1f, 1000.0f) * l_Projection;
+
+    l_mvp = l_Projection * l_Model;
+
+    glUniformMatrix4fv(g_uMVP, 1, GL_FALSE, glm::value_ptr(l_mvp) /*mvp*/);
 
     glDrawElements(GL_TRIANGLES, g_model.indexCount, GL_UNSIGNED_INT, NULL);
+}
+
+void cursor_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    if (isnan(new_x) && isnan(new_y)) glfwGetCursorPos(window, &new_x, &new_y);
+    else
+    {
+        old_x = new_x;
+        old_y = new_y;
+        glfwGetCursorPos(window, &new_x, &new_y);
+    }
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+    {
+        if (!isnan(old_x) && !isnan(new_y))
+        {
+            printf("(old_x: %f, old_y: %f), (new_x: %f, new_y: %f), deviation - %f;\n", old_x, old_y, new_x, new_y, new_x - old_x);
+
+            l_Model = glm::rotate(l_Model, glm::radians(glm::f32(new_x - old_x)*360/800), glm::vec3(0, 0, 1));
+            l_Model = glm::rotate(l_Model, glm::radians(glm::f32(new_y - old_y) * 360 / 600), glm::vec3(1, 0, 0));
+        }
+    }
 }
 
 void cleanup()
@@ -257,6 +291,9 @@ bool initOpenGL()
 
     // Create window.
     g_window = glfwCreateWindow(800, 600, "OpenGL Test", NULL, NULL);
+
+    // Set display function
+    glfwSetCursorPosCallback(g_window, cursor_callback);
     if (g_window == NULL)
     {
         cout << "Failed to open GLFW window" << endl;
@@ -276,6 +313,10 @@ bool initOpenGL()
         cout << "Failed to initialize GLEW" << endl;
         return false;
     }
+
+    l_Model = glm::scale(l_Model, glm::vec3(0.25f, 0.25f, 0.25f));
+    l_Model = glm::rotate(l_Model, glm::radians(0.0f), glm::vec3(1, 0, 0));
+    l_Model = glm::rotate(l_Model, glm::radians(0.0f), glm::vec3(0, 0, 1));
 
     // Ensure we can capture the escape key being pressed.
     glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_TRUE);
@@ -300,7 +341,6 @@ int main()
 
     // Initialize graphical resources.
     bool isOk = init();
-
     if (isOk)
     {
         // Main loop until window closed or escape pressed.
