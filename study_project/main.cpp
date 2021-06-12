@@ -6,6 +6,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <gl/glut.h>
 #include <math.h>
+#include <fstream>
+#include <string>
 
 // MV - Modal View Matrix
 // Modal transform (translate, rotate, scale) is to convert from object space to world space.
@@ -14,7 +16,10 @@
 using namespace std;
 double old_x = numeric_limits<double>::quiet_NaN(), old_y = numeric_limits<double>::quiet_NaN();
 double new_x = numeric_limits<double>::quiet_NaN(), new_y = numeric_limits<double>::quiet_NaN();
-glm::mat4 l_Model = glm::identity<glm::mat4>();
+glm::mat4 l_model = glm::identity<glm::mat4>();
+glm::mat4 l_scale = glm::identity<glm::mat4>();
+glm::mat4 l_rotation = glm::identity<glm::mat4>();
+glm::mat4 l_translate = glm::identity<glm::mat4>();
 
 GLFWwindow* g_window;
 
@@ -31,6 +36,13 @@ public:
 };
 
 Model g_model;
+
+void read_file(string path, string& result) {
+    ifstream file(path);
+    if (file.is_open())
+        getline(file, result, '$');
+    file.close();
+}
 
 GLuint createShader(const GLchar* code, GLenum type)
 {
@@ -93,40 +105,13 @@ bool createShaderProgram()
 {
     g_shaderProgram = 0;
 
-    const GLchar vsh[] =
-        "#version 330\n"
-        ""
-        "layout(location = 0) in vec3 a_position;"
-        "layout(location = 1) in vec3 a_color;"
-        ""
-        "uniform mat4 u_mvp;"
-        ""
-        "out vec3 v_color;"
-        ""
-        "void main()"
-        "{"
-        "    v_color = a_color;"
-        "    gl_Position = u_mvp * vec4(a_position, 1.0);"
-        "}"
-        ;
-
-    const GLchar fsh[] =
-        "#version 330\n"
-        ""
-        "in vec3 v_color;"
-        ""
-        "layout(location = 0) out vec4 o_color;"
-        ""
-        "void main()"
-        "{"
-        "   o_color = vec4(v_color, 1.0);"
-        "}"
-        ;
-
+    string vertex_shader, fragment_shader;
+    read_file("vertex_shader.txt", vertex_shader);
+    read_file("fragment_shader.txt", fragment_shader);
     GLuint vertexShader, fragmentShader;
 
-    vertexShader = createShader(vsh, GL_VERTEX_SHADER);
-    fragmentShader = createShader(fsh, GL_FRAGMENT_SHADER);
+    vertexShader = createShader(vertex_shader.c_str(), GL_VERTEX_SHADER);
+    fragmentShader = createShader(fragment_shader.c_str(), GL_FRAGMENT_SHADER);
 
     g_shaderProgram = createProgram(vertexShader, fragmentShader);
 
@@ -140,61 +125,52 @@ bool createShaderProgram()
 
 bool createModel()
 {
-    const GLfloat vertices[] =
-    {
-        -1.0, -1.0, 1.0, 1.0, 0.0, 0.0,
-        1.0, -1.0, 1.0, 1.0, 0.0, 0.0,
-        1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
-        -1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
+    const int cubes = 100;
 
-        1.0, -1.0, 1.0, 1.0, 1.0, 0.0,
-        1.0, -1.0, -1.0, 1.0, 1.0, 0.0,
-        1.0, 1.0, -1.0, 1.0, 1.0, 0.0,
-        1.0, 1.0, 1.0, 1.0, 1.0, 0.0,
+    GLfloat* vertices = new GLfloat[cubes * cubes * 4 * 6];
 
-        1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
-        1.0, 1.0, -1.0, 1.0, 0.0, 1.0,
-        -1.0, 1.0, -1.0, 1.0, 0.0, 1.0,
-        -1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+    for (int i = 0, position = 0; i < cubes; i++)
+        for (int j = 0; j < cubes; j++)
+        {
+            for (int k = 0; k < 4; k++)
+            {
+                vertices[position] = (i + (k == 1 || k == 2 ? 1 : 0))*8.0f/cubes - 4.0f;
+                vertices[position + 1] = 0;
+                vertices[position + 2] = (j + (k == 2 || k == 3 ? 1 : 0)) * 8.0f/ cubes - 4.0f;
+                vertices[position + 3] = 0;
+                vertices[position + 4] = 1;
+                vertices[position + 5] = 0;
+                position += 6;
+            }
+        }
 
-        -1.0, 1.0, 1.0, 0.0, 1.0, 1.0,
-        -1.0, 1.0, -1.0, 0.0, 1.0, 1.0,
-        -1.0, -1.0, -1.0, 0.0, 1.0, 1.0,
-        -1.0, -1.0, 1.0, 0.0, 1.0, 1.0,
+    GLuint* indices = new GLuint[cubes * cubes * 6];
 
-        -1.0, -1.0, 1.0, 0.0, 1.0, 0.0,
-        -1.0, -1.0, -1.0, 0.0, 1.0, 0.0,
-        1.0, -1.0, -1.0, 0.0, 1.0, 0.0,
-        1.0, -1.0, 1.0, 0.0, 1.0, 0.0,
-
-        -1.0, -1.0, -1.0, 0.0, 0.0, 1.0,
-        -1.0, 1.0, -1.0, 0.0, 0.0, 1.0,
-        1.0, 1.0, -1.0, 0.0, 0.0, 1.0,
-        1.0, -1.0, -1.0, 0.0, 0.0, 1.0,
-    };
-
-    const GLuint indices[] =
-    {
-        0, 1, 2, 2, 3, 0,
-        4, 5, 6, 6, 7, 4,
-        8, 9, 10, 10, 11, 8,
-        12, 13, 14, 14, 15, 12,
-        16, 17, 18, 18, 19, 16,
-        20, 21, 22, 22, 23, 20
-    };
+    for (int i = 0, position = 0, start_index = 0; i < cubes; i++)
+        for (int j = 0; j < cubes; j++)
+        {
+            indices[position] = start_index;
+            indices[position + 1] = start_index + 1;
+            indices[position + 2] = start_index + 2;
+            indices[position + 3] = start_index + 2;
+            indices[position + 4] = start_index + 3;
+            indices[position + 5] = start_index;
+            position += 6;
+            start_index += 4;
+        }
 
     glGenVertexArrays(1, &g_model.vao);
     glBindVertexArray(g_model.vao);
 
     glGenBuffers(1, &g_model.vbo);
     glBindBuffer(GL_ARRAY_BUFFER, g_model.vbo);
-    glBufferData(GL_ARRAY_BUFFER, 24 * 6 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, cubes * cubes * 4 * 6 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
 
     glGenBuffers(1, &g_model.ibo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_model.ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * 6 * sizeof(GLuint), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubes * cubes * 6 * sizeof(GLuint), indices, GL_STATIC_DRAW);
 
-    g_model.indexCount = 6 * 6;
+    g_model.indexCount = cubes * cubes * 6;
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (const GLvoid*)0);
@@ -234,9 +210,11 @@ void draw(void)
     l_Projection = glm::ortho(-800.0f / 600.0f, 800.0f / 600.0f, -1.0f, 1.0f, 0.1f, 1000.0f);
     l_Projection = glm::perspective(45.0f, 800.0f / 600.0f, 0.1f, 1000.0f) * l_Projection;
 
-    l_mvp = l_Projection * l_Model;
+    l_model = l_translate * l_rotation * l_scale;
 
-    glUniformMatrix4fv(g_uMVP, 1, GL_FALSE, glm::value_ptr(l_mvp) /*mvp*/);
+    l_mvp = l_Projection * l_model;
+
+    glUniformMatrix4fv(g_uMVP, 1, GL_FALSE, glm::value_ptr(l_mvp));
 
     glDrawElements(GL_TRIANGLES, g_model.indexCount, GL_UNSIGNED_INT, NULL);
 }
@@ -254,10 +232,10 @@ void cursor_callback(GLFWwindow* window, double xpos, double ypos)
     {
         if (!isnan(old_x) && !isnan(new_y))
         {
-            printf("(old_x: %f, old_y: %f), (new_x: %f, new_y: %f), deviation - %f;\n", old_x, old_y, new_x, new_y, new_x - old_x);
-
-            l_Model = glm::rotate(l_Model, glm::radians(glm::f32(new_x - old_x)*360/800), glm::vec3(0, 0, 1));
-            l_Model = glm::rotate(l_Model, glm::radians(glm::f32(new_y - old_y) * 360 / 600), glm::vec3(1, 0, 0));
+            if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+                l_rotation = glm::rotate(l_rotation, glm::radians(glm::f32(new_x - old_x)*360/800), glm::vec3(0, 1, 0));
+            if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+                l_rotation = glm::rotate(l_rotation, glm::radians(glm::f32(new_y - old_y) * 360 / 600), glm::vec3(1, 0, 0));
         }
     }
 }
@@ -314,9 +292,8 @@ bool initOpenGL()
         return false;
     }
 
-    l_Model = glm::scale(l_Model, glm::vec3(0.25f, 0.25f, 0.25f));
-    l_Model = glm::rotate(l_Model, glm::radians(0.0f), glm::vec3(1, 0, 0));
-    l_Model = glm::rotate(l_Model, glm::radians(0.0f), glm::vec3(0, 0, 1));
+    l_scale = glm::scale(l_scale, glm::vec3(0.5f, 0.5f, 0.5f));
+    l_rotation = glm::rotate(l_rotation, glm::radians(-30.0f), glm::vec3(1, 0, 0));
 
     // Ensure we can capture the escape key being pressed.
     glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_TRUE);
