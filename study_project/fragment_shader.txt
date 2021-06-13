@@ -2,11 +2,21 @@
 
 in vec3 v_color;
 in vec3 v_normal;
+in vec3 v_position;
 
 layout(location = 0) out vec4 o_color;
 
+const float gamma = 2.2;
+
 void main()
 {
-	o_color = vec4(abs(v_normal)*v_color, 1.0);
+	vec3 n = normalize(v_normal);
+	vec3 l = normalize(vec3(1.0, 1.0, 0) - v_position);
+	vec3 e = normalize(-v_pos);
+	float d = max(dot(1, n), 0.1);
+	vec3 h = normalize(l + e);
+	float s = pow(max(dot(h, n), 0.0), 20.0);
+	vec3 lin_color = v_color * d + vec3(s);
+	o_color = vec4(pow(lin_color, 1.0 / gamma), 1.0);
 }
 $
