@@ -1,0 +1,29 @@
+#version 330
+
+layout(location = 0) in vec3 a_position;
+layout(location = 1) in vec3 a_color;
+
+uniform mat4 u_mvp;
+uniform float u_max_value_unsigned;
+
+out vec3 v_color;
+out vec3 v_normal;
+
+vec3 f(vec3 coord)
+{
+	coord.y = sin(coord.x * coord.x + coord.z * coord.z);
+    return coord/u_max_value_unsigned;
+}
+
+vec3 gradient(vec3 coord)
+{
+  return vec3(-cos(coord.x * coord.x + coord.z * coord.z) * 2 * coord.x, 1, -cos(coord.x * coord.x + coord.z * coord.z) * 2 * coord.z);
+}
+
+void main()
+{
+    v_color = a_color;
+    v_normal = normalize(gradient(a_position));
+    gl_Position = u_mvp * vec4(f(a_position),1.0);
+}
+$

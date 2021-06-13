@@ -1,13 +1,40 @@
 #include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
+#include <math.h>
+#include <fstream>
+#include <string>
+#include "arcball_camera.h"
+
+// MV - Modal View Matrix
+// Modal transform (translate, rotate, scale) is to convert from object space to world space.
+// View transform is to convert from world space to eye space.
 
 using namespace std;
+const GLfloat max_value_unsigned = 10.0f;
+const float scroll_speed = 0.01f;
+
+ArcballCamera arcball_camera = ArcballCamera(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 1, 0.1, glm::radians(30.0f), glm::radians(45.0f));
+
+double old_x = numeric_limits<double>::quiet_NaN(), old_y = numeric_limits<double>::quiet_NaN();
+double new_x = numeric_limits<double>::quiet_NaN(), new_y = numeric_limits<double>::quiet_NaN();
+
+float start_scale = 1.0f;
+
+glm::mat4 l_model = glm::identity<glm::mat4>();
+glm::mat4 l_scale = glm::identity<glm::mat4>();
+glm::mat4 l_rotation = glm::identity<glm::mat4>();
+glm::mat4 l_translate = glm::identity<glm::mat4>();
+glm::mat4 l_Projection = glm::identity<glm::mat4>();
 
 GLFWwindow* g_window;
 
 GLuint g_shaderProgram;
 GLint g_uMVP;
+GLint g_uMaxValueUnsigned;
 
 class Model
 {
@@ -20,11 +47,18 @@ public:
 
 Model g_model;
 
+void read_file(string path, string& result) {
+    ifstream file(path);
+    if (file.is_open())
+        getline(file, result, '$');
+    file.close();
+}
+
 GLuint createShader(const GLchar* code, GLenum type)
 {
     GLuint result = glCreateShader(type);
 
-    glShaderSource(result, 1, &code, NULL);
+    glShaderSource(result, 1, &code, nullptr);
     glCompileShader(result);
 
     GLint compiled;
@@ -39,7 +73,7 @@ GLuint createShader(const GLchar* code, GLenum type)
             char* infoLog = new char[infoLen];
             glGetShaderInfoLog(result, infoLen, NULL, infoLog);
             cout << "Shader compilation error" << endl << infoLog << endl;
-            delete infoLog;
+            delete[] infoLog;
         }
         glDeleteShader(result);
         return 0;
@@ -81,44 +115,18 @@ bool createShaderProgram()
 {
     g_shaderProgram = 0;
 
-    const GLchar vsh[] =
-        "#version 330\n"
-        ""
-        "layout(location = 0) in vec3 a_position;"
-        "layout(location = 1) in vec3 a_color;"
-        ""
-        "uniform mat4 u_mvp;"
-        ""
-        "out vec3 v_color;"
-        ""
-        "void main()"
-        "{"
-        "    v_color = a_color;"
-        "    gl_Position = u_mvp * vec4(a_position, 1.0);"
-        "}"
-        ;
-
-    const GLchar fsh[] =
-        "#version 330\n"
-        ""
-        "in vec3 v_color;"
-        ""
-        "layout(location = 0) out vec4 o_color;"
-        ""
-        "void main()"
-        "{"
-        "   o_color = vec4(v_color, 1.0);"
-        "}"
-        ;
-
+    string vertex_shader, fragment_shader;
+    read_file("vertex_shader.txt", vertex_shader);
+    read_file("fragment_shader.txt", fragment_shader);
     GLuint vertexShader, fragmentShader;
 
-    vertexShader = createShader(vsh, GL_VERTEX_SHADER);
-    fragmentShader = createShader(fsh, GL_FRAGMENT_SHADER);
+    vertexShader = createShader((GLchar*)vertex_shader.c_str(), GL_VERTEX_SHADER);
+    fragmentShader = createShader((GLchar*)fragment_shader.c_str(), GL_FRAGMENT_SHADER);
 
     g_shaderProgram = createProgram(vertexShader, fragmentShader);
 
     g_uMVP = glGetUniformLocation(g_shaderProgram, "u_mvp");
+    g_uMaxValueUnsigned = glGetUniformLocation(g_shaderProgram, "u_max_value_unsigned");
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
@@ -128,66 +136,60 @@ bool createShaderProgram()
 
 bool createModel()
 {
-    const GLfloat vertices[] =
-    {
-        -1.0, -1.0, 1.0, 1.0, 0.0, 0.0,
-        1.0, -1.0, 1.0, 1.0, 0.0, 0.0,
-        1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
-        -1.0, 1.0, 1.0, 1.0, 0.0, 0.0,
+    const int cubes = 1000;
 
-        1.0, -1.0, 1.0, 1.0, 1.0, 0.0,
-        1.0, -1.0, -1.0, 1.0, 1.0, 0.0,
-        1.0, 1.0, -1.0, 1.0, 1.0, 0.0,
-        1.0, 1.0, 1.0, 1.0, 1.0, 0.0,
+    GLfloat* vertices = new GLfloat[cubes * cubes * 4 * 6];
 
-        1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
-        1.0, 1.0, -1.0, 1.0, 0.0, 1.0,
-        -1.0, 1.0, -1.0, 1.0, 0.0, 1.0,
-        -1.0, 1.0, 1.0, 1.0, 0.0, 1.0,
+    for (int i = 0, position = 0; i < cubes; i++)
+        for (int j = 0; j < cubes; j++)
+        {
+            for (int k = 0; k < 4; k++)
+            {
+                vertices[position] = (i + (k == 1 || k == 2 ? 1 : 0)) * max_value_unsigned /cubes - max_value_unsigned /2.0f;
+                vertices[position + 1] = 0;
+                vertices[position + 2] = (j + (k == 2 || k == 3 ? 1 : 0)) * max_value_unsigned / cubes - max_value_unsigned / 2.0f;
+                vertices[position + 3] = 0;
+                vertices[position + 4] = 1;
+                vertices[position + 5] = 0;
+                position += 6;
+            }
+        }
 
-        -1.0, 1.0, 1.0, 0.0, 1.0, 1.0,
-        -1.0, 1.0, -1.0, 0.0, 1.0, 1.0,
-        -1.0, -1.0, -1.0, 0.0, 1.0, 1.0,
-        -1.0, -1.0, 1.0, 0.0, 1.0, 1.0,
+    GLuint* indices = new GLuint[cubes * cubes * 6];
 
-        -1.0, -1.0, 1.0, 0.0, 1.0, 0.0,
-        -1.0, -1.0, -1.0, 0.0, 1.0, 0.0,
-        1.0, -1.0, -1.0, 0.0, 1.0, 0.0,
-        1.0, -1.0, 1.0, 0.0, 1.0, 0.0,
-
-        -1.0, -1.0, -1.0, 0.0, 0.0, 1.0,
-        -1.0, 1.0, -1.0, 0.0, 0.0, 1.0,
-        1.0, 1.0, -1.0, 0.0, 0.0, 1.0,
-        1.0, -1.0, -1.0, 0.0, 0.0, 1.0,
-    };
-
-    const GLuint indices[] =
-    {
-        0, 1, 2, 2, 3, 0,
-        4, 5, 6, 6, 7, 4,
-        8, 9, 10, 10, 11, 8,
-        12, 13, 14, 14, 15, 12,
-        16, 17, 18, 18, 19, 16,
-        20, 21, 22, 22, 23, 20
-    };
+    for (int i = 0, position = 0, start_index = 0; i < cubes; i++)
+        for (int j = 0; j < cubes; j++)
+        {
+            indices[position] = start_index;
+            indices[position + 1] = start_index + 1;
+            indices[position + 2] = start_index + 2;
+            indices[position + 3] = start_index + 2;
+            indices[position + 4] = start_index + 3;
+            indices[position + 5] = start_index;
+            position += 6;
+            start_index += 4;
+        }
 
     glGenVertexArrays(1, &g_model.vao);
     glBindVertexArray(g_model.vao);
 
     glGenBuffers(1, &g_model.vbo);
     glBindBuffer(GL_ARRAY_BUFFER, g_model.vbo);
-    glBufferData(GL_ARRAY_BUFFER, 24 * 6 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, cubes * cubes * 4 * 6 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
 
     glGenBuffers(1, &g_model.ibo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_model.ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * 6 * sizeof(GLuint), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubes * cubes * 6 * sizeof(GLuint), indices, GL_STATIC_DRAW);
 
-    g_model.indexCount = 6 * 6;
+    g_model.indexCount = cubes * cubes * 6;
 
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (const GLvoid*)0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (const GLvoid*)(3 * sizeof(GLfloat)));
+
+    delete[] vertices;
+    delete[] indices;
 
     return g_model.vbo != 0 && g_model.ibo != 0 && g_model.vao != 0;
 }
@@ -207,7 +209,7 @@ void reshape(GLFWwindow* window, int width, int height)
     glViewport(0, 0, width, height);
 }
 
-void draw()
+void draw(void)
 {
     // Clear color buffer.
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -215,17 +217,44 @@ void draw()
     glUseProgram(g_shaderProgram);
     glBindVertexArray(g_model.vao);
 
-    const GLfloat mvp[] =
-    {
-        1.708748f, -1.478188f, -0.360884f, -0.353738f,
-        0.000000f, 1.208897f, -0.883250f, -0.865760f,
-        -1.707388f, -1.479366f, -0.361171f, -0.354019f,
-        0.000000f, 0.000000f, 4.898990f, 5.000000f
-    };
+    glm::mat4 l_mvp;
 
-    glUniformMatrix4fv(g_uMVP, 1, GL_FALSE, mvp);
+    l_model = l_translate * l_rotation * l_scale;
+
+    l_mvp = l_Projection * arcball_camera.getViewMatrix() * l_model;
+
+    glUniformMatrix4fv(g_uMVP, 1, GL_FALSE, glm::value_ptr(l_mvp));
+    glUniform1fv(g_uMaxValueUnsigned, 1, &max_value_unsigned);
 
     glDrawElements(GL_TRIANGLES, g_model.indexCount, GL_UNSIGNED_INT, NULL);
+}
+
+void cursor_callback(GLFWwindow* window, double xpos, double ypos)
+{
+    if (isnan(new_x) && isnan(new_y)) glfwGetCursorPos(window, &new_x, &new_y);
+    else
+    {
+        old_x = new_x;
+        old_y = new_y;
+        glfwGetCursorPos(window, &new_x, &new_y);
+    }
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS)
+    {
+        if (!isnan(old_x) && !isnan(new_y))
+        {
+            arcball_camera.rotateAzimuth(glm::radians(glm::f32(new_x - old_x) * 180 / 600));
+            arcball_camera.rotatePolar(glm::radians(glm::f32(new_y - old_y) * 180 / 600));
+        }
+    }
+}
+
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffest)
+{
+    if (yoffest < 0)
+        start_scale -= abs(yoffest) * scroll_speed;
+    else
+        start_scale += abs(yoffest) * scroll_speed;
+    l_scale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(start_scale));
 }
 
 void cleanup()
@@ -257,6 +286,11 @@ bool initOpenGL()
 
     // Create window.
     g_window = glfwCreateWindow(800, 600, "OpenGL Test", NULL, NULL);
+
+    // Set display function
+    glfwSetCursorPosCallback(g_window, cursor_callback);
+    glfwSetScrollCallback(g_window, scroll_callback);
+
     if (g_window == NULL)
     {
         cout << "Failed to open GLFW window" << endl;
@@ -276,6 +310,10 @@ bool initOpenGL()
         cout << "Failed to initialize GLEW" << endl;
         return false;
     }
+    l_translate = glm::translate(l_scale,glm::vec3(0.0f, 0.0f, 0.0f));
+    l_scale = glm::scale(l_scale, glm::vec3(start_scale));
+
+    l_Projection = glm::ortho(-1.0f, 1.0f, -4.0f/3.0f, 4.0f/3.0f, 0.1f, 100.0f);
 
     // Ensure we can capture the escape key being pressed.
     glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_TRUE);
@@ -300,7 +338,6 @@ int main()
 
     // Initialize graphical resources.
     bool isOk = init();
-
     if (isOk)
     {
         // Main loop until window closed or escape pressed.
