@@ -4,27 +4,34 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
-#include <gl/glut.h>
 #include <math.h>
 #include <fstream>
 #include <string>
+#include "arcball_camera.h"
 
 // MV - Modal View Matrix
 // Modal transform (translate, rotate, scale) is to convert from object space to world space.
 // View transform is to convert from world space to eye space.
 
 using namespace std;
+const GLfloat max_value_unsigned = 10.0f;
+
+ArcballCamera arcball_camera = ArcballCamera(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 1, 0.1, glm::radians(30.0f), glm::radians(45.0f));
+
 double old_x = numeric_limits<double>::quiet_NaN(), old_y = numeric_limits<double>::quiet_NaN();
 double new_x = numeric_limits<double>::quiet_NaN(), new_y = numeric_limits<double>::quiet_NaN();
+
 glm::mat4 l_model = glm::identity<glm::mat4>();
 glm::mat4 l_scale = glm::identity<glm::mat4>();
 glm::mat4 l_rotation = glm::identity<glm::mat4>();
 glm::mat4 l_translate = glm::identity<glm::mat4>();
+glm::mat4 l_Projection = glm::identity<glm::mat4>();
 
 GLFWwindow* g_window;
 
 GLuint g_shaderProgram;
 GLint g_uMVP;
+GLint g_uMaxValueUnsigned;
 
 class Model
 {
@@ -116,6 +123,7 @@ bool createShaderProgram()
     g_shaderProgram = createProgram(vertexShader, fragmentShader);
 
     g_uMVP = glGetUniformLocation(g_shaderProgram, "u_mvp");
+    g_uMaxValueUnsigned = glGetUniformLocation(g_shaderProgram, "u_max_value_unsigned");
 
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
@@ -134,9 +142,9 @@ bool createModel()
         {
             for (int k = 0; k < 4; k++)
             {
-                vertices[position] = (i + (k == 1 || k == 2 ? 1 : 0))*8.0f/cubes - 4.0f;
+                vertices[position] = (i + (k == 1 || k == 2 ? 1 : 0)) * max_value_unsigned /cubes - max_value_unsigned /2.0f;
                 vertices[position + 1] = 0;
-                vertices[position + 2] = (j + (k == 2 || k == 3 ? 1 : 0)) * 8.0f/ cubes - 4.0f;
+                vertices[position + 2] = (j + (k == 2 || k == 3 ? 1 : 0)) * max_value_unsigned / cubes - max_value_unsigned / 2.0f;
                 vertices[position + 3] = 0;
                 vertices[position + 4] = 1;
                 vertices[position + 5] = 0;
@@ -203,18 +211,14 @@ void draw(void)
     glUseProgram(g_shaderProgram);
     glBindVertexArray(g_model.vao);
 
-    
-    glm::mat4 l_Projection;
     glm::mat4 l_mvp;
-
-    l_Projection = glm::ortho(-800.0f / 600.0f, 800.0f / 600.0f, -1.0f, 1.0f, 0.1f, 1000.0f);
-    l_Projection = glm::perspective(45.0f, 800.0f / 600.0f, 0.1f, 1000.0f) * l_Projection;
 
     l_model = l_translate * l_rotation * l_scale;
 
-    l_mvp = l_Projection * l_model;
+    l_mvp = l_Projection * arcball_camera.getViewMatrix() * l_model;
 
     glUniformMatrix4fv(g_uMVP, 1, GL_FALSE, glm::value_ptr(l_mvp));
+    glUniform1fv(g_uMaxValueUnsigned, 1, &max_value_unsigned);
 
     glDrawElements(GL_TRIANGLES, g_model.indexCount, GL_UNSIGNED_INT, NULL);
 }
@@ -232,10 +236,8 @@ void cursor_callback(GLFWwindow* window, double xpos, double ypos)
     {
         if (!isnan(old_x) && !isnan(new_y))
         {
-            if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
-                l_rotation = glm::rotate(l_rotation, glm::radians(glm::f32(new_x - old_x)*360/800), glm::vec3(0, 1, 0));
-            if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
-                l_rotation = glm::rotate(l_rotation, glm::radians(glm::f32(new_y - old_y) * 360 / 600), glm::vec3(1, 0, 0));
+            arcball_camera.rotateAzimuth(glm::radians(glm::f32(new_x - old_x) * 180 / 600));
+            arcball_camera.rotatePolar(glm::radians(glm::f32(new_y - old_y) * 180 / 600));
         }
     }
 }
@@ -272,6 +274,7 @@ bool initOpenGL()
 
     // Set display function
     glfwSetCursorPosCallback(g_window, cursor_callback);
+
     if (g_window == NULL)
     {
         cout << "Failed to open GLFW window" << endl;
@@ -291,9 +294,10 @@ bool initOpenGL()
         cout << "Failed to initialize GLEW" << endl;
         return false;
     }
+    l_translate = glm::translate(l_scale,glm::vec3(0.0f, 0.0f, 0.0f));
+    l_scale = glm::scale(l_scale, glm::vec3(1.0f, 1.0f, 1.0f));
 
-    l_scale = glm::scale(l_scale, glm::vec3(0.5f, 0.5f, 0.5f));
-    l_rotation = glm::rotate(l_rotation, glm::radians(-30.0f), glm::vec3(1, 0, 0));
+    l_Projection = glm::ortho(-1.0f, 1.0f, -4.0f/3.0f, 4.0f/3.0f, 0.1f, 100.0f);
 
     // Ensure we can capture the escape key being pressed.
     glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_TRUE);

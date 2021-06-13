@@ -4,6 +4,7 @@ layout(location = 0) in vec3 a_position;
 layout(location = 1) in vec3 a_color;
 
 uniform mat4 u_mvp;
+uniform float u_max_value_unsigned;
 
 out vec3 v_color;
 out vec3 v_normal;
@@ -11,7 +12,7 @@ out vec3 v_normal;
 vec3 f(vec3 coord)
 {
 	coord.y = sin(coord.x)*cos(coord.z);
-    return coord/8.0;
+    return coord/u_max_value_unsigned;
 }
 
 vec3 gradient(vec3 point)
