@@ -63,11 +63,6 @@ glm::vec3 ArcballCamera::getUpVector() const
 	return upVector_;
 }
 
-glm::vec3 ArcballCamera::getNormalizedViewVector() const
-{
-	return glm::normalize(ArcballCamera::getViewPoint());
-}
-
 float ArcballCamera::getAzimuthAngle() const
 {
 	return azimuthAngle_;

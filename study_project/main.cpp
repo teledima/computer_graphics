@@ -55,7 +55,7 @@ GLuint createShader(const GLchar* code, GLenum type)
 {
     GLuint result = glCreateShader(type);
 
-    glShaderSource(result, 1, &code, NULL);
+    glShaderSource(result, 1, &code, nullptr);
     glCompileShader(result);
 
     GLint compiled;
@@ -70,7 +70,7 @@ GLuint createShader(const GLchar* code, GLenum type)
             char* infoLog = new char[infoLen];
             glGetShaderInfoLog(result, infoLen, NULL, infoLog);
             cout << "Shader compilation error" << endl << infoLog << endl;
-            delete infoLog;
+            delete[] infoLog;
         }
         glDeleteShader(result);
         return 0;
@@ -117,8 +117,8 @@ bool createShaderProgram()
     read_file("fragment_shader.txt", fragment_shader);
     GLuint vertexShader, fragmentShader;
 
-    vertexShader = createShader(vertex_shader.c_str(), GL_VERTEX_SHADER);
-    fragmentShader = createShader(fragment_shader.c_str(), GL_FRAGMENT_SHADER);
+    vertexShader = createShader((GLchar*)vertex_shader.c_str(), GL_VERTEX_SHADER);
+    fragmentShader = createShader((GLchar*)fragment_shader.c_str(), GL_FRAGMENT_SHADER);
 
     g_shaderProgram = createProgram(vertexShader, fragmentShader);
 
@@ -184,6 +184,9 @@ bool createModel()
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (const GLvoid*)0);
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (const GLvoid*)(3 * sizeof(GLfloat)));
+
+    delete[] vertices;
+    delete[] indices;
 
     return g_model.vbo != 0 && g_model.ibo != 0 && g_model.vao != 0;
 }
@@ -295,7 +298,7 @@ bool initOpenGL()
         return false;
     }
     l_translate = glm::translate(l_scale,glm::vec3(0.0f, 0.0f, 0.0f));
-    l_scale = glm::scale(l_scale, glm::vec3(1.0f, 1.0f, 1.0f));
+    l_scale = glm::scale(l_scale, glm::vec3(1.5f, 1.5f, 1.5f));
 
     l_Projection = glm::ortho(-1.0f, 1.0f, -4.0f/3.0f, 4.0f/3.0f, 0.1f, 100.0f);
 

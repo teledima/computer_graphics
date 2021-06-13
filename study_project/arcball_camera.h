@@ -13,7 +13,6 @@ public:
     glm::vec3 getEye() const;
     glm::vec3 getViewPoint() const;
     glm::vec3 getUpVector() const;
-    glm::vec3 getNormalizedViewVector() const;
     float getAzimuthAngle() const;
     float getPolarAngle() const;
     float getRadius() const;
