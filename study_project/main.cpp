@@ -15,11 +15,14 @@
 
 using namespace std;
 const GLfloat max_value_unsigned = 10.0f;
+const float scroll_speed = 0.01f;
 
 ArcballCamera arcball_camera = ArcballCamera(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 1, 0.1, glm::radians(30.0f), glm::radians(45.0f));
 
 double old_x = numeric_limits<double>::quiet_NaN(), old_y = numeric_limits<double>::quiet_NaN();
 double new_x = numeric_limits<double>::quiet_NaN(), new_y = numeric_limits<double>::quiet_NaN();
+
+float start_scale = 1.0f;
 
 glm::mat4 l_model = glm::identity<glm::mat4>();
 glm::mat4 l_scale = glm::identity<glm::mat4>();
@@ -133,7 +136,7 @@ bool createShaderProgram()
 
 bool createModel()
 {
-    const int cubes = 100;
+    const int cubes = 1000;
 
     GLfloat* vertices = new GLfloat[cubes * cubes * 4 * 6];
 
@@ -245,6 +248,15 @@ void cursor_callback(GLFWwindow* window, double xpos, double ypos)
     }
 }
 
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffest)
+{
+    if (yoffest < 0)
+        start_scale -= abs(yoffest) * scroll_speed;
+    else
+        start_scale += abs(yoffest) * scroll_speed;
+    l_scale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(start_scale));
+}
+
 void cleanup()
 {
     if (g_shaderProgram != 0)
@@ -277,6 +289,7 @@ bool initOpenGL()
 
     // Set display function
     glfwSetCursorPosCallback(g_window, cursor_callback);
+    glfwSetScrollCallback(g_window, scroll_callback);
 
     if (g_window == NULL)
     {
@@ -298,7 +311,7 @@ bool initOpenGL()
         return false;
     }
     l_translate = glm::translate(l_scale,glm::vec3(0.0f, 0.0f, 0.0f));
-    l_scale = glm::scale(l_scale, glm::vec3(1.5f, 1.5f, 1.5f));
+    l_scale = glm::scale(l_scale, glm::vec3(start_scale));
 
     l_Projection = glm::ortho(-1.0f, 1.0f, -4.0f/3.0f, 4.0f/3.0f, 0.1f, 100.0f);
 
