@@ -5,7 +5,7 @@ layout(location = 1) in vec3 a_color;
 
 uniform mat4 u_mvp;
 uniform mat4 u_mv;
-uniform mat3 u_mv_tran_in;
+uniform mat3 u_normal_mv;
 uniform float u_max_value_unsigned;
 
 out vec3 v_color;
@@ -31,6 +31,6 @@ void main()
     gl_Position = u_mvp * l_pos;
 
     v_posistion = (u_mv * l_pos).xyz;
-    v_normal = normalize(u_mv_tran_in * n);
+    v_normal = normalize(u_normal_mv * n);
 }
 $
