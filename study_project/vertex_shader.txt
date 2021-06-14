@@ -30,7 +30,8 @@ void main()
     vec3 n = gradient(a_position);
     gl_Position = u_mvp * l_pos;
 
-    v_posistion = (u_mv * l_pos).xyz;
-    v_normal = normalize(u_normal_mv * n);
+    v_position = (u_mv * l_pos).xyz;
+    // v_normal = normalize(u_normal_mv * n);
+    v_normal = normalize(n);
 }
 $
