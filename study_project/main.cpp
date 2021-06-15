@@ -8,146 +8,45 @@
 #include <fstream>
 #include <string>
 #include "arcball_camera.h"
+#include "model.h"
 
 // MV - Modal View Matrix
 // Modal transform (translate, rotate, scale) is to convert from object space to world space.
 // View transform is to convert from world space to eye space.
 
 using namespace std;
-const GLfloat max_value_unsigned = 10.0f;
-const float scroll_speed = 0.01f;
+const float max_value_unsigned = 10.0f;
+const int quads_surface = 1000;
+const int width_box = 4;
+const int height_box = 6;
 
-ArcballCamera arcball_camera = ArcballCamera(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 1, 0.1, glm::radians(30.0f), glm::radians(45.0f));
+float Model::scroll_speed = 0.01f;
 
 double old_x = numeric_limits<double>::quiet_NaN(), old_y = numeric_limits<double>::quiet_NaN();
 double new_x = numeric_limits<double>::quiet_NaN(), new_y = numeric_limits<double>::quiet_NaN();
 
-float start_scale = 1.0f;
-
 glm::mat4 l_model = glm::identity<glm::mat4>();
-glm::mat4 l_scale = glm::identity<glm::mat4>();
-glm::mat4 l_rotation = glm::identity<glm::mat4>();
-glm::mat4 l_translate = glm::identity<glm::mat4>();
-glm::mat4 l_Projection = glm::identity<glm::mat4>();
+glm::mat4 l_Projection = glm::ortho(-1.0f, 1.0f, -4.0f / 3.0f, 4.0f / 3.0f, 0.1f, 1000.0f);
+glm::vec3 light_position = glm::vec3(0.9f, 1.0f, 0.6f);
 
 GLFWwindow* g_window;
+GLuint program_id;
 
-GLuint g_shaderProgram;
-GLint g_uMVP;
-GLint g_uMaxValueUnsigned;
+ArcballCamera* arcball_camera = new ArcballCamera(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 2, 0.1f, glm::radians<float>(30.0f), glm::radians<float>(45.0f));
 
-class Model
+Model* g_surface_model; 
+Model* g_lightbox;
+
+void callbackCreateSurface(GLfloat*& vertices, GLuint*& indices, int &width, int &height, float& max_value)
 {
-public:
-    GLuint vbo;
-    GLuint ibo;
-    GLuint vao;
-    GLsizei indexCount;
-};
-
-Model g_model;
-
-void read_file(string path, string& result) {
-    ifstream file(path);
-    if (file.is_open())
-        getline(file, result, '$');
-    file.close();
-}
-
-GLuint createShader(const GLchar* code, GLenum type)
-{
-    GLuint result = glCreateShader(type);
-
-    glShaderSource(result, 1, &code, nullptr);
-    glCompileShader(result);
-
-    GLint compiled;
-    glGetShaderiv(result, GL_COMPILE_STATUS, &compiled);
-
-    if (!compiled)
-    {
-        GLint infoLen = 0;
-        glGetShaderiv(result, GL_INFO_LOG_LENGTH, &infoLen);
-        if (infoLen > 0)
-        {
-            char* infoLog = new char[infoLen];
-            glGetShaderInfoLog(result, infoLen, NULL, infoLog);
-            cout << "Shader compilation error" << endl << infoLog << endl;
-            delete[] infoLog;
-        }
-        glDeleteShader(result);
-        return 0;
-    }
-
-    return result;
-}
-
-GLuint createProgram(GLuint vsh, GLuint fsh)
-{
-    GLuint result = glCreateProgram();
-
-    glAttachShader(result, vsh);
-    glAttachShader(result, fsh);
-
-    glLinkProgram(result);
-
-    GLint linked;
-    glGetProgramiv(result, GL_LINK_STATUS, &linked);
-
-    if (!linked)
-    {
-        GLint infoLen = 0;
-        glGetProgramiv(result, GL_INFO_LOG_LENGTH, &infoLen);
-        if (infoLen > 0)
-        {
-            char* infoLog = (char*)alloca(infoLen);
-            glGetProgramInfoLog(result, infoLen, NULL, infoLog);
-            cout << "Shader program linking error" << endl << infoLog << endl;
-        }
-        glDeleteProgram(result);
-        return 0;
-    }
-
-    return result;
-}
-
-bool createShaderProgram()
-{
-    g_shaderProgram = 0;
-
-    string vertex_shader, fragment_shader;
-    read_file("vertex_shader.txt", vertex_shader);
-    read_file("fragment_shader.txt", fragment_shader);
-    GLuint vertexShader, fragmentShader;
-
-    vertexShader = createShader((GLchar*)vertex_shader.c_str(), GL_VERTEX_SHADER);
-    fragmentShader = createShader((GLchar*)fragment_shader.c_str(), GL_FRAGMENT_SHADER);
-
-    g_shaderProgram = createProgram(vertexShader, fragmentShader);
-
-    g_uMVP = glGetUniformLocation(g_shaderProgram, "u_mvp");
-    g_uMaxValueUnsigned = glGetUniformLocation(g_shaderProgram, "u_max_value_unsigned");
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    return g_shaderProgram != 0;
-}
-
-bool createModel()
-{
-    const int cubes = 1000;
-
-    GLfloat* vertices = new GLfloat[cubes * cubes * 4 * 6];
-
-    for (int i = 0, position = 0; i < cubes; i++)
-        for (int j = 0; j < cubes; j++)
+    for (int i = 0, position = 0; i < height; i++)
+        for (int j = 0; j < width; j++)
         {
             for (int k = 0; k < 4; k++)
             {
-                vertices[position] = (i + (k == 1 || k == 2 ? 1 : 0)) * max_value_unsigned /cubes - max_value_unsigned /2.0f;
+                vertices[position] = (i + (k == 1 || k == 2 ? 1 : 0)) * max_value / height - max_value / 2.0f;
                 vertices[position + 1] = 0;
-                vertices[position + 2] = (j + (k == 2 || k == 3 ? 1 : 0)) * max_value_unsigned / cubes - max_value_unsigned / 2.0f;
+                vertices[position + 2] = (j + (k == 2 || k == 3 ? 1 : 0)) * max_value / width - max_value / 2.0f;
                 vertices[position + 3] = 0;
                 vertices[position + 4] = 1;
                 vertices[position + 5] = 0;
@@ -155,10 +54,8 @@ bool createModel()
             }
         }
 
-    GLuint* indices = new GLuint[cubes * cubes * 6];
-
-    for (int i = 0, position = 0, start_index = 0; i < cubes; i++)
-        for (int j = 0; j < cubes; j++)
+    for (int i = 0, position = 0, start_index = 0; i < height; i++)
+        for (int j = 0; j < width; j++)
         {
             indices[position] = start_index;
             indices[position + 1] = start_index + 1;
@@ -169,64 +66,78 @@ bool createModel()
             position += 6;
             start_index += 4;
         }
+}
 
-    glGenVertexArrays(1, &g_model.vao);
-    glBindVertexArray(g_model.vao);
+void callbackCreateLightBox(GLfloat*& vertices, GLuint*& indices, int& width, int& height, float& max_value)
+{
+    vertices = new GLfloat[]
+    {
+        -1.0, -1.0, 1.0, 1.0, 1.0, 1.0,
+        1.0, -1.0, 1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        -1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
 
-    glGenBuffers(1, &g_model.vbo);
-    glBindBuffer(GL_ARRAY_BUFFER, g_model.vbo);
-    glBufferData(GL_ARRAY_BUFFER, cubes * cubes * 4 * 6 * sizeof(GLfloat), vertices, GL_STATIC_DRAW);
+        1.0, -1.0, 1.0, 1.0, 1.0, 1.0,
+        1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, -1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
 
-    glGenBuffers(1, &g_model.ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, g_model.ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, cubes * cubes * 6 * sizeof(GLuint), indices, GL_STATIC_DRAW);
+        1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, -1.0, 1.0, 1.0, 1.0,
+        -1.0, 1.0, -1.0, 1.0, 1.0, 1.0,
+        -1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
 
-    g_model.indexCount = cubes * cubes * 6;
+        -1.0, 1.0, 1.0, 1.0, 1.0, 1.0,
+        -1.0, 1.0, -1.0, 1.0, 1.0, 1.0,
+        -1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+        -1.0, -1.0, 1.0, 1.0, 1.0, 1.0,
 
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (const GLvoid*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (const GLvoid*)(3 * sizeof(GLfloat)));
+        -1.0, -1.0, 1.0, 1.0, 1.0, 1.0,
+        -1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+        1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+        1.0, -1.0, 1.0, 1.0, 1.0, 1.0,
 
-    delete[] vertices;
-    delete[] indices;
+        -1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+        -1.0, 1.0, -1.0, 1.0, 1.0, 1.0,
+        1.0, 1.0, -1.0, 1.0, 1.0, 1.0,
+        1.0, -1.0, -1.0, 1.0, 1.0, 1.0,
+    };
 
-    return g_model.vbo != 0 && g_model.ibo != 0 && g_model.vao != 0;
+    indices = new GLuint[]
+    {
+        0, 1, 2, 2, 3, 0,
+        4, 5, 6, 6, 7, 4,
+        8, 9, 10, 10, 11, 8,
+        12, 13, 14, 14, 15, 12,
+        16, 17, 18, 18, 19, 16,
+        20, 21, 22, 22, 23, 20
+    };
 }
 
 bool init()
 {
     // Set initial color of color buffer to white.
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     glEnable(GL_DEPTH_TEST);
+    g_surface_model = new Model(max_value_unsigned, glm::identity<glm::mat4>(), glm::identity<glm::mat4>(), 1.5f, (char*)"vertex_shader.txt", (char*)"fragment_shader.txt");
+    g_lightbox = new Model(1.0, g_surface_model->translation_matrix, g_surface_model->rotation_matrix, 0.01f, (char*)"vertex_shader_lightbox.txt", (char*)"fragment_shader_lightbox.txt");
+    bool success_model_create = g_surface_model->create(callbackCreateSurface, (int&)quads_surface, (int&)quads_surface);
+    bool succes_lightbox_create = g_lightbox->create(callbackCreateLightBox, (int&)width_box, (int&)height_box);
 
-    return createShaderProgram() && createModel();
+    if (g_surface_model->program_id != 0 && success_model_create && g_lightbox -> program_id != 0 && succes_lightbox_create)
+    {
+        g_surface_model->translate(glm::vec3(0.0f, 0.0f, 0.0f));
+
+        g_lightbox->translate(light_position);
+        return 1;
+    }
+    else return 0;
 }
 
 void reshape(GLFWwindow* window, int width, int height)
 {
     glViewport(0, 0, width, height);
-}
-
-void draw(void)
-{
-    // Clear color buffer.
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    glUseProgram(g_shaderProgram);
-    glBindVertexArray(g_model.vao);
-
-    glm::mat4 l_mvp;
-
-    l_model = l_translate * l_rotation * l_scale;
-
-    l_mvp = l_Projection * arcball_camera.getViewMatrix() * l_model;
-
-    glUniformMatrix4fv(g_uMVP, 1, GL_FALSE, glm::value_ptr(l_mvp));
-    glUniform1fv(g_uMaxValueUnsigned, 1, &max_value_unsigned);
-
-    glDrawElements(GL_TRIANGLES, g_model.indexCount, GL_UNSIGNED_INT, NULL);
 }
 
 void cursor_callback(GLFWwindow* window, double xpos, double ypos)
@@ -242,31 +153,15 @@ void cursor_callback(GLFWwindow* window, double xpos, double ypos)
     {
         if (!isnan(old_x) && !isnan(new_y))
         {
-            arcball_camera.rotateAzimuth(glm::radians(glm::f32(new_x - old_x) * 180 / 600));
-            arcball_camera.rotatePolar(glm::radians(glm::f32(new_y - old_y) * 180 / 600));
+            arcball_camera->rotateAzimuth(glm::radians(glm::f32(new_x - old_x) * 180 / 600));
+            arcball_camera->rotatePolar(glm::radians(glm::f32(new_y - old_y) * 180 / 600));
         }
     }
 }
 
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffest)
+void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-    if (yoffest < 0)
-        start_scale -= abs(yoffest) * scroll_speed;
-    else
-        start_scale += abs(yoffest) * scroll_speed;
-    l_scale = glm::scale(glm::identity<glm::mat4>(), glm::vec3(start_scale));
-}
-
-void cleanup()
-{
-    if (g_shaderProgram != 0)
-        glDeleteProgram(g_shaderProgram);
-    if (g_model.vbo != 0)
-        glDeleteBuffers(1, &g_model.vbo);
-    if (g_model.ibo != 0)
-        glDeleteBuffers(1, &g_model.ibo);
-    if (g_model.vao != 0)
-        glDeleteVertexArrays(1, &g_model.vao);
+    g_surface_model->scale_scroll((float)yoffset);
 }
 
 bool initOpenGL()
@@ -310,10 +205,6 @@ bool initOpenGL()
         cout << "Failed to initialize GLEW" << endl;
         return false;
     }
-    l_translate = glm::translate(l_scale,glm::vec3(0.0f, 0.0f, 0.0f));
-    l_scale = glm::scale(l_scale, glm::vec3(start_scale));
-
-    l_Projection = glm::ortho(-1.0f, 1.0f, -4.0f/3.0f, 4.0f/3.0f, 0.1f, 100.0f);
 
     // Ensure we can capture the escape key being pressed.
     glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_TRUE);
@@ -344,7 +235,28 @@ int main()
         while (glfwGetKey(g_window, GLFW_KEY_ESCAPE) != GLFW_PRESS && glfwWindowShouldClose(g_window) == 0)
         {
             // Draw scene.
-            draw();
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            glUseProgram(g_surface_model->program_id);
+            glBindVertexArray(g_surface_model->vao);
+
+            glm::mat4 l_mvp;
+            l_mvp = l_Projection * arcball_camera->getViewMatrix() * g_surface_model->translation_matrix * g_surface_model->rotation_matrix * g_surface_model->scaling_matrix;
+
+            glUniformMatrix4fv(glGetUniformLocation(g_surface_model->program_id, "u_mvp"), 1, GL_FALSE, glm::value_ptr(l_mvp));
+            glUniform1fv(glGetUniformLocation(g_surface_model->program_id, "u_max_value_unsigned"), 1, &g_surface_model->max_value);
+
+            glDrawElements(GL_TRIANGLES, g_surface_model->indexCount, GL_UNSIGNED_INT, NULL);
+            
+            glUseProgram(g_lightbox->program_id);
+            glBindVertexArray(g_lightbox->vao);
+
+            l_mvp = l_Projection * arcball_camera->getViewMatrix() * g_lightbox->translation_matrix * g_lightbox->rotation_matrix * g_surface_model->scaling_matrix * g_lightbox->scaling_matrix;
+
+            glUniformMatrix4fv(glGetUniformLocation(g_lightbox->program_id, "u_mvp"), 1, GL_FALSE, glm::value_ptr(l_mvp));
+            glUniform1fv(glGetUniformLocation(g_lightbox->program_id, "u_max_value_unsigned"), 1, &g_lightbox->max_value);
+
+            glDrawElements(GL_TRIANGLES, g_lightbox->indexCount, GL_UNSIGNED_INT, NULL);
 
             // Swap buffers.
             glfwSwapBuffers(g_window);
@@ -354,7 +266,9 @@ int main()
     }
 
     // Cleanup graphical resources.
-    cleanup();
+    delete g_surface_model;
+    delete g_lightbox;
+    delete arcball_camera;
 
     // Tear down OpenGL.
     tearDownOpenGL();

@@ -143,13 +143,17 @@
   <ItemGroup>
     <ClCompile Include="arcball_camera.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="model.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="fragment_shader.txt" />
+    <Text Include="fragment_shader_lightbox.txt" />
     <Text Include="vertex_shader.txt" />
+    <Text Include="vertex_shader_lightbox.txt" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="arcball_camera.h" />
+    <ClInclude Include="model.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

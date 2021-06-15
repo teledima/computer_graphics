@@ -21,6 +21,9 @@
     <ClCompile Include="arcball_camera.cpp">
       <Filter>Исходные файлы</Filter>
     </ClCompile>
+    <ClCompile Include="model.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Text Include="vertex_shader.txt">
@@ -29,9 +32,18 @@
     <Text Include="fragment_shader.txt">
       <Filter>Файлы ресурсов</Filter>
     </Text>
+    <Text Include="fragment_shader_lightbox.txt">
+      <Filter>Файлы ресурсов</Filter>
+    </Text>
+    <Text Include="vertex_shader_lightbox.txt">
+      <Filter>Файлы ресурсов</Filter>
+    </Text>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="arcball_camera.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="model.h">
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
