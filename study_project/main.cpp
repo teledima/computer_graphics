@@ -27,7 +27,7 @@ double new_x = numeric_limits<double>::quiet_NaN(), new_y = numeric_limits<doubl
 
 glm::mat4 l_model = glm::identity<glm::mat4>();
 glm::mat4 l_Projection = glm::ortho(-1.0f, 1.0f, -4.0f / 3.0f, 4.0f / 3.0f, 0.1f, 1000.0f);
-glm::vec3 light_position = glm::vec3(1.0f, 1.0f, 0.0f);
+glm::vec3 light_position = glm::vec3(1.0f, 1.0f, 1.0f);
 
 GLFWwindow* g_window;
 GLuint program_id;
@@ -241,16 +241,16 @@ int main()
             glBindVertexArray(g_surface_model->vao);
 
             glm::mat4 l_mvp;
-            glm::mat4 l_mv;
-            glm::mat3 l_normal_mv;
+            glm::mat4 l_m;
+            glm::mat3 l_normal_m;
             l_mvp = l_Projection * arcball_camera->getViewMatrix() * g_surface_model->translation_matrix * g_surface_model->rotation_matrix * g_surface_model->scaling_matrix;
-            l_mv = g_surface_model->translation_matrix * g_surface_model->rotation_matrix * g_surface_model->scaling_matrix;
-            l_normal_mv = (glm::transpose(glm::inverse(glm::mat3(l_mv))));
+            l_m = g_surface_model->translation_matrix * g_surface_model->rotation_matrix * g_surface_model->scaling_matrix;
+            l_normal_m = (glm::transpose(glm::inverse(glm::mat3(l_m))));
 
             glUniformMatrix4fv(glGetUniformLocation(g_surface_model->program_id, "u_mvp"), 1, GL_FALSE, glm::value_ptr(l_mvp));
             glUniform1fv(glGetUniformLocation(g_surface_model->program_id, "u_max_value_unsigned"), 1, &g_surface_model->max_value);
-            glUniformMatrix4fv(glGetUniformLocation(g_surface_model->program_id, "u_mv"), 1, GL_FALSE, glm::value_ptr(l_mv));
-            glUniformMatrix3fv(glGetUniformLocation(g_surface_model->program_id, "u_normal_mv"), 1, GL_FALSE, glm::value_ptr(l_normal_mv));
+            glUniformMatrix4fv(glGetUniformLocation(g_surface_model->program_id, "u_m"), 1, GL_FALSE, glm::value_ptr(l_m));
+            glUniformMatrix3fv(glGetUniformLocation(g_surface_model->program_id, "u_normal_m"), 1, GL_FALSE, glm::value_ptr(l_normal_m));
             glUniform3fv(glGetUniformLocation(g_surface_model->program_id, "u_light_pos"), 1, glm::value_ptr(glm::vec4(light_position, 1.0f)));
             glUniform3fv(glGetUniformLocation(g_surface_model->program_id, "u_view_pos"), 1, glm::value_ptr(arcball_camera->getEye()));
 
