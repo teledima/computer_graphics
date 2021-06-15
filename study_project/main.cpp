@@ -27,12 +27,12 @@ double new_x = numeric_limits<double>::quiet_NaN(), new_y = numeric_limits<doubl
 
 glm::mat4 l_model = glm::identity<glm::mat4>();
 glm::mat4 l_Projection = glm::ortho(-1.0f, 1.0f, -4.0f / 3.0f, 4.0f / 3.0f, 0.1f, 1000.0f);
-glm::vec3 light_position = glm::vec3(0.8f, 1.0f, 0.0f);
+glm::vec3 light_position = glm::vec3(0.9f, 1.0f, 0.6f);
 
 GLFWwindow* g_window;
 GLuint program_id;
 
-ArcballCamera* arcball_camera = new ArcballCamera(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 1, 0.1f, glm::radians<float>(30.0f), glm::radians<float>(45.0f));
+ArcballCamera* arcball_camera = new ArcballCamera(glm::vec3(0, 0, 0), glm::vec3(0, 1, 0), 2, 0.1f, glm::radians<float>(30.0f), glm::radians<float>(45.0f));
 
 Model* g_surface_model; 
 Model* g_lightbox;
@@ -121,7 +121,7 @@ bool init()
 
     glEnable(GL_DEPTH_TEST);
     g_surface_model = new Model(max_value_unsigned, glm::identity<glm::mat4>(), glm::identity<glm::mat4>(), 1.5f, (char*)"vertex_shader.txt", (char*)"fragment_shader.txt");
-    g_lightbox = new Model(1.0, glm::identity<glm::mat4>(), glm::identity<glm::mat4>(), 0.01f, (char*)"vertex_shader_lightbox.txt", (char*)"fragment_shader_lightbox.txt");
+    g_lightbox = new Model(1.0, g_surface_model->translation_matrix, g_surface_model->rotation_matrix, 0.01f, (char*)"vertex_shader_lightbox.txt", (char*)"fragment_shader_lightbox.txt");
     bool success_model_create = g_surface_model->create(callbackCreateSurface, (int&)quads_surface, (int&)quads_surface);
     bool succes_lightbox_create = g_lightbox->create(callbackCreateLightBox, (int&)width_box, (int&)height_box);
 
@@ -129,7 +129,7 @@ bool init()
     {
         g_surface_model->translate(glm::vec3(0.0f, 0.0f, 0.0f));
 
-        g_lightbox->translate(glm::vec3(0.6f, 0.5f, 0.6f));
+        g_lightbox->translate(light_position);
         return 1;
     }
     else return 0;
@@ -206,9 +206,6 @@ bool initOpenGL()
         return false;
     }
 
-    //g_light_box->translate(glm::vec3(1, 1, 1));
-    //g_light_box->scale(glm::vec3(0.1));
-
     // Ensure we can capture the escape key being pressed.
     glfwSetInputMode(g_window, GLFW_STICKY_KEYS, GL_TRUE);
 
@@ -254,7 +251,7 @@ int main()
             glUseProgram(g_lightbox->program_id);
             glBindVertexArray(g_lightbox->vao);
 
-            l_mvp = l_Projection * arcball_camera->getViewMatrix() * g_lightbox->translation_matrix * g_lightbox->rotation_matrix * g_lightbox->scaling_matrix;
+            l_mvp = l_Projection * arcball_camera->getViewMatrix() * g_lightbox->translation_matrix * g_lightbox->rotation_matrix * g_surface_model->scaling_matrix * g_lightbox->scaling_matrix;
 
             glUniformMatrix4fv(glGetUniformLocation(g_lightbox->program_id, "u_mvp"), 1, GL_FALSE, glm::value_ptr(l_mvp));
             glUniform1fv(glGetUniformLocation(g_lightbox->program_id, "u_max_value_unsigned"), 1, &g_lightbox->max_value);
