@@ -1,3 +1,4 @@
+#define STB_IMAGE_IMPLEMENTATION
 #include <iostream>
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
@@ -7,6 +8,7 @@
 #include <math.h>
 #include <fstream>
 #include <string>
+#include "stb_image.h"
 #include "arcball_camera.h"
 #include "model.h"
 
@@ -15,7 +17,7 @@
 // View transform is to convert from world space to eye space.
 
 using namespace std;
-const float max_value_unsigned = 10.0f;
+const float max_value_unsigned = 8.0f;
 const int quads_surface = 1000;
 const int width_box = 4;
 const int height_box = 6;
@@ -24,6 +26,10 @@ float Model::scroll_speed = 0.01f;
 
 double old_x = numeric_limits<double>::quiet_NaN(), old_y = numeric_limits<double>::quiet_NaN();
 double new_x = numeric_limits<double>::quiet_NaN(), new_y = numeric_limits<double>::quiet_NaN();
+
+unsigned int sand_texture;
+unsigned int water_texture;
+
 
 glm::mat4 l_model = glm::identity<glm::mat4>();
 glm::mat4 l_Projection = glm::ortho(-1.0f, 1.0f, -4.0f / 3.0f, 4.0f / 3.0f, 0.1f, 1000.0f);
@@ -119,11 +125,43 @@ bool init()
     // Set initial color of color buffer to white.
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
+
     glEnable(GL_DEPTH_TEST);
     g_surface_model = new Model(max_value_unsigned, glm::identity<glm::mat4>(), glm::identity<glm::mat4>(), 1.5f, (char*)"vertex_shader.txt", (char*)"fragment_shader.txt");
     g_lightbox = new Model(1.0, g_surface_model->translation_matrix, g_surface_model->rotation_matrix, 0.01f, (char*)"vertex_shader_lightbox.txt", (char*)"fragment_shader_lightbox.txt");
     bool success_model_create = g_surface_model->create(callbackCreateSurface, (int&)quads_surface, (int&)quads_surface);
     bool succes_lightbox_create = g_lightbox->create(callbackCreateLightBox, (int&)width_box, (int&)height_box);
+
+    glGenTextures(1, &sand_texture);
+    glBindTexture(GL_TEXTURE_2D, sand_texture);
+
+    int width, height, nrChannels;
+    unsigned char* data = stbi_load("sand.jpg", &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Failed to load sand texture" << std::endl;
+    }
+    stbi_image_free(data);
+    // texture 2
+    glGenTextures(1, &water_texture);
+    glBindTexture(GL_TEXTURE_2D, water_texture);
+    data = stbi_load("water.jpg", &width, &height, &nrChannels, 0);
+    if (data)
+    {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+        glGenerateMipmap(GL_TEXTURE_2D);
+    }
+    else
+    {
+        std::cout << "Failed to load water texture" << std::endl;
+    }
+    stbi_image_free(data);
+
 
     if (g_surface_model->program_id != 0 && success_model_create && g_lightbox -> program_id != 0 && succes_lightbox_create)
     {
@@ -212,6 +250,8 @@ bool initOpenGL()
     // Set callback for framebuffer resizing event.
     glfwSetFramebufferSizeCallback(g_window, reshape);
 
+
+
     return true;
 }
 
@@ -236,6 +276,10 @@ int main()
         {
             // Draw scene.
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, sand_texture);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, water_texture);
 
             glUseProgram(g_surface_model->program_id);
             glBindVertexArray(g_surface_model->vao);
@@ -253,6 +297,8 @@ int main()
             glUniformMatrix3fv(glGetUniformLocation(g_surface_model->program_id, "u_normal_m"), 1, GL_FALSE, glm::value_ptr(l_normal_m));
             glUniform3fv(glGetUniformLocation(g_surface_model->program_id, "u_light_pos"), 1, glm::value_ptr(glm::vec4(light_position, 1.0f)));
             glUniform3fv(glGetUniformLocation(g_surface_model->program_id, "u_view_pos"), 1, glm::value_ptr(arcball_camera->getEye()));
+            glUniform1i(glGetUniformLocation(g_surface_model->program_id, "u_texture_sand"), 0);
+            glUniform1i(glGetUniformLocation(g_surface_model->program_id, "u_texture_water"), 1);
 
             glDrawElements(GL_TRIANGLES, g_surface_model->indexCount, GL_UNSIGNED_INT, NULL);
             
@@ -277,6 +323,8 @@ int main()
     delete g_surface_model;
     delete g_lightbox;
     delete arcball_camera;
+    glDeleteTextures(1, &sand_texture);
+    glDeleteTextures(1, &water_texture);
 
     // Tear down OpenGL.
     tearDownOpenGL();

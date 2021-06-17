@@ -3,11 +3,14 @@
 in vec3 v_color;
 in vec3 v_normal;
 in vec3 v_position;
+in vec2 v_tex_coord;
 
 layout(location = 0) out vec4 o_color;
 
 uniform vec3 u_light_pos;
 uniform vec3 u_view_pos;
+uniform sampler2D u_texture_sand;
+uniform sampler2D u_texture_water;
 
 const float gamma = 2.2;
 const float ambient_strength = 0.0;
@@ -16,9 +19,8 @@ const vec3 light_color = vec3(1.0, 1.0, 1.0);
 
 void main()
 {
-	vec3 ambient = ambient_strength * light_color;
-
 	vec3 n = normalize(v_normal);
+	vec3 ambient = ambient_strength * light_color;
 	vec3 light_vec = normalize(u_light_pos - v_position);
 
 	float diff = max(dot(light_vec, n), ambient_strength);
@@ -32,8 +34,12 @@ void main()
 	float spec = pow(max(dot(n, halfway_vec), specular_strength), 32);
 	vec3 specular = spec * light_color;	
 
-	vec3 result = (ambient + diffuse + specular) * v_color;
-	o_color = vec4(pow(result, vec3(1.0 / gamma)), 1.0);
+	vec4 sand_color = texture(u_texture_sand, v_tex_coord);
+	vec4 water_color = texture(u_texture_water, v_tex_coord);
+	vec4 mix_color = mix(sand_color, water_color,
+						 distance(v_position, vec3(0.0))<=0.3?0.9:0);
 
+	vec3 result = (ambient + diffuse + specular) * mix_color.rgb;
+	o_color = vec4(pow(result, vec3(1.0 / gamma)), mix_color.a);
 }
 $

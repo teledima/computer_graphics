@@ -155,6 +155,10 @@
     <ClInclude Include="arcball_camera.h" />
     <ClInclude Include="model.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="sand.jpg" />
+    <Image Include="water.jpg" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

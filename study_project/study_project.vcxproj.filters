@@ -47,4 +47,12 @@
       <Filter>Файлы заголовков</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="sand.jpg">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="water.jpg">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+  </ItemGroup>
 </Project>
