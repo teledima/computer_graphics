@@ -15,13 +15,13 @@ out vec2 v_tex_coord;
 
 vec3 f(vec3 coord)
 {
-	coord.y = sin(coord.x * coord.x + coord.z * coord.z);
-    return coord/u_max_value_unsigned;
+	coord.y = sin(coord.x * coord.x + coord.z * coord.z) / 2.0;
+    return coord / u_max_value_unsigned;
 }
 
 vec3 gradient(vec3 coord)
 {
-  return vec3(-cos(coord.x * coord.x + coord.z * coord.z) * 2 * coord.x, 1, -cos(coord.x * coord.x + coord.z * coord.z) * 2 * coord.z);
+  return vec3(-cos(coord.x * coord.x + coord.z * coord.z)  * coord.x, 1, -cos(coord.x * coord.x + coord.z * coord.z) * coord.z);
 }
 
 void main()
